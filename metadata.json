@@ -1,0 +1,6 @@
+{
+  "name": "Teka Somba Phone",
+  "description": "A highly secure mobile phone marketplace in the Democratic Republic of Congo focused on Kinshasa. Features KYC verification, secure exchange zones (Rond-point Victoire), and price negotiation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
