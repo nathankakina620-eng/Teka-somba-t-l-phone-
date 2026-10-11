@@ -1,0 +1,885 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from "react";
+import { Listing, PhoneDetails, UserProfile } from "../types";
+import { KINSHASA_SAFE_ZONES } from "../data/mockData";
+import { 
+  X, 
+  Upload, 
+  Image as ImageIcon, 
+  DollarSign, 
+  FileText, 
+  Smartphone, 
+  Check, 
+  Trash2, 
+  Plus, 
+  Sparkles, 
+  ShieldCheck, 
+  RefreshCw,
+  ExternalLink
+} from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
+
+interface AdminEditListingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  listingToEdit?: Listing | null; // If null, we are in "Create new listing" mode
+  currentUser: UserProfile | null;
+  onSaveListing: (listing: Listing) => void;
+}
+
+const BRANDS = ["Apple", "Samsung", "Tecno", "Infinix", "Xiaomi", "Huawei", "Itel", "Oppo", "Google Pixel", "Sony"];
+const SCREEN_CONDITIONS = ["Comme neuf", "Très bon état", "Fissuré", "Rayé"] as const;
+const OP_STATUSES = ["Parfait", "Problèmes mineurs", "En panne"] as const;
+const LOCK_STATUSES = ["Aucun", "iCloud", "Google Lock", "Opérateur"] as const;
+
+// Sample curated photos of common smartphones in Kinshasa
+const PRESET_SAMPLE_PHOTOS = [
+  { label: "iPhone 15 Pro Titane", url: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?q=80&w=600&fit=crop" },
+  { label: "iPhone 14 Pro Max", url: "https://images.unsplash.com/photo-1663499482523-1c0c1bae4ce1?q=80&w=600&fit=crop" },
+  { label: "iPhone 13 Bleu", url: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=600&fit=crop" },
+  { label: "iPhone 12 / 11 Noir", url: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=600&fit=crop" },
+  { label: "Samsung Galaxy S23 Ultra", url: "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?q=80&w=600&fit=crop" },
+  { label: "Samsung Galaxy S22 / S21", url: "https://images.unsplash.com/photo-1580910051074-3eb694886505?q=80&w=600&fit=crop" },
+  { label: "Tecno Camon 30 / Spark", url: "https://images.unsplash.com/photo-1565849904461-04a58ad377e0?q=80&w=600&fit=crop" },
+  { label: "Infinix Note / Hot", url: "https://images.unsplash.com/photo-1585060544812-6b45742d762f?q=80&w=600&fit=crop" },
+  { label: "Google Pixel / Android", url: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?q=80&w=600&fit=crop" },
+];
+
+// Quick description snippet presets
+const DESCRIPTION_TEMPLATES = [
+  "Téléphone 100% original certifié non-volé avec vérification IMEI effectuée.",
+  "Batterie en excellente condition d'origine, aucune pièce remplacée.",
+  "Écran d'origine parfait, sans micro-rayures ni fissures, Face ID / Touch ID opérationnel.",
+  "Fourni avec boîte d'origine, câble de charge rapide et coque de protection offerte.",
+  "Test complet possible lors de la remise sécurisée au point d'échange public à Kinshasa."
+];
+
+export default function AdminEditListingModal({
+  isOpen,
+  onClose,
+  listingToEdit,
+  currentUser,
+  onSaveListing
+}: AdminEditListingModalProps) {
+  const { isLight } = useTheme();
+
+  // Basic info
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState<number | "">("");
+  const [currency, setCurrency] = useState<"USD" | "CDF">("USD");
+  const [exchangeRate, setExchangeRate] = useState(2820);
+  const [isAvailable, setIsAvailable] = useState(true);
+
+  // Phone technical details
+  const [brand, setBrand] = useState("Apple");
+  const [model, setModel] = useState("");
+  const [ram, setRam] = useState(8);
+  const [storage, setStorage] = useState(256);
+  const [batteryHealth, setBatteryHealth] = useState(100);
+  const [screenCondition, setScreenCondition] = useState<"Comme neuf" | "Très bon état" | "Fissuré" | "Rayé">("Comme neuf");
+  const [imei, setImei] = useState("");
+  const [operationalStatus, setOperationalStatus] = useState<"Parfait" | "Problèmes mineurs" | "En panne">("Parfait");
+  const [systemLock, setSystemLock] = useState<"Aucun" | "iCloud" | "Google Lock" | "Opérateur">("Aucun");
+  const [preferredZone, setPreferredZone] = useState("victoire");
+
+  // Photos state
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [customPhotoUrl, setCustomPhotoUrl] = useState("");
+  const [showPresets, setShowPresets] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Populate state on open or listingToEdit change
+  useEffect(() => {
+    if (listingToEdit) {
+      setTitle(listingToEdit.title);
+      setDescription(listingToEdit.description);
+      setPrice(listingToEdit.price);
+      setCurrency(listingToEdit.currency || "USD");
+      setExchangeRate(listingToEdit.exchangeRate || 2820);
+      setIsAvailable(listingToEdit.isAvailable);
+      setBrand(listingToEdit.phone.brand || "Apple");
+      setModel(listingToEdit.phone.model || "");
+      setRam(listingToEdit.phone.ram || 8);
+      setStorage(listingToEdit.phone.storage || 128);
+      setBatteryHealth(listingToEdit.phone.batteryHealth ?? 95);
+      setScreenCondition(listingToEdit.phone.screenCondition || "Comme neuf");
+      setImei(listingToEdit.phone.imei || "");
+      setOperationalStatus(listingToEdit.phone.operationalStatus || "Parfait");
+      setSystemLock(listingToEdit.phone.systemLock || "Aucun");
+      setPreferredZone(listingToEdit.preferredSafeExchangeZoneId || "victoire");
+      setPhotos(listingToEdit.photos || []);
+    } else {
+      // Default creation values
+      setTitle("");
+      setDescription("Téléphone original testé et certifié conforme. Disponible pour échange sécurisé à Kinshasa.");
+      setPrice("");
+      setCurrency("USD");
+      setExchangeRate(2820);
+      setIsAvailable(true);
+      setBrand("Apple");
+      setModel("");
+      setRam(8);
+      setStorage(256);
+      setBatteryHealth(98);
+      setScreenCondition("Comme neuf");
+      setImei("3589" + Math.floor(1000000000 + Math.random() * 9000000000));
+      setOperationalStatus("Parfait");
+      setSystemLock("Aucun");
+      setPreferredZone("victoire");
+      setPhotos([
+        "https://images.unsplash.com/photo-1695048133142-1a20484d2569?q=80&w=600&fit=crop",
+        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=600&fit=crop",
+        "https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=600&fit=crop"
+      ]);
+    }
+    setErrorMsg("");
+    setCustomPhotoUrl("");
+  }, [listingToEdit, isOpen]);
+
+  if (!isOpen) return null;
+
+  // Add custom photo URL
+  const handleAddPhotoUrl = () => {
+    if (!customPhotoUrl.trim()) return;
+    setPhotos(prev => [...prev, customPhotoUrl.trim()]);
+    setCustomPhotoUrl("");
+    setErrorMsg("");
+  };
+
+  // Upload local images via file reader
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setPhotos(prev => [...prev, event.target!.result as string]);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+    setErrorMsg("");
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSetMainPhoto = (index: number) => {
+    if (index === 0) return;
+    setPhotos(prev => {
+      const selected = prev[index];
+      const rest = prev.filter((_, i) => i !== index);
+      return [selected, ...rest];
+    });
+  };
+
+  const handleAddPresetPhoto = (url: string) => {
+    setPhotos(prev => [...prev, url]);
+    setErrorMsg("");
+  };
+
+  const handleAppendDescriptionTemplate = (snippet: string) => {
+    setDescription(prev => {
+      if (!prev.trim()) return snippet;
+      return `${prev}\n• ${snippet}`;
+    });
+  };
+
+  const calculatedCDF = price && !isNaN(Number(price)) 
+    ? Math.round(Number(price) * exchangeRate).toLocaleString() 
+    : "0";
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    if (!title.trim()) {
+      setErrorMsg("Veuillez donner un titre à l'article.");
+      return;
+    }
+
+    if (!model.trim()) {
+      setErrorMsg("Veuillez préciser le modèle de l'appareil.");
+      return;
+    }
+
+    if (!price || isNaN(Number(price)) || Number(price) <= 0) {
+      setErrorMsg("Veuillez indiquer un prix valide (en dollars USD).");
+      return;
+    }
+
+    if (photos.length === 0) {
+      setErrorMsg("Veuillez ajouter au moins une photo pour cet article.");
+      return;
+    }
+
+    const phoneDetails: PhoneDetails = {
+      brand,
+      model: model.trim(),
+      ram: Number(ram),
+      storage: Number(storage),
+      batteryHealth: Number(batteryHealth),
+      screenCondition,
+      imei: imei.trim() || ("3589" + Math.floor(1000000000 + Math.random() * 9000000000)),
+      operationalStatus,
+      systemLock,
+    };
+
+    const updatedListing: Listing = {
+      id: listingToEdit ? listingToEdit.id : `list-admin-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      sellerId: listingToEdit ? listingToEdit.sellerId : (currentUser?.id || "admin-official"),
+      sellerName: listingToEdit ? listingToEdit.sellerName : (currentUser?.name || "Teka Somba Phone (Administration)"),
+      sellerPhone: listingToEdit ? listingToEdit.sellerPhone : (currentUser?.phone || "+243844885529"),
+      sellerIsVerified: true,
+      sellerReputation: listingToEdit ? listingToEdit.sellerReputation : 100,
+      phone: phoneDetails,
+      price: Number(price),
+      currency,
+      exchangeRate: Number(exchangeRate) || 2820,
+      title: title.trim(),
+      description: description.trim() || `Appareil ${brand} ${model} certifié conforme pour la vente à Kinshasa.`,
+      photos,
+      createdAt: listingToEdit ? listingToEdit.createdAt : new Date().toISOString(),
+      location: listingToEdit?.location || {
+        province: currentUser?.province || "Kinshasa",
+        commune: currentUser?.commune || "Gombe / Kalamu"
+      },
+      preferredSafeExchangeZoneId: preferredZone,
+      isAvailable,
+    };
+
+    onSaveListing(updatedListing);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 z-50 overflow-y-auto animate-fade-in">
+      <div className={`w-full max-w-4xl rounded-3xl shadow-2xl border flex flex-col my-auto max-h-[92vh] overflow-hidden transition-colors ${
+        isLight ? "bg-white border-slate-200" : "bg-neutral-900 border-neutral-800"
+      }`}>
+        
+        {/* Header */}
+        <div className={`p-5 sm:p-6 border-b flex items-center justify-between shrink-0 ${
+          isLight ? "bg-slate-50 border-slate-200" : "bg-neutral-950 border-neutral-850"
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-400 text-neutral-950 rounded-2xl shadow-xs font-bold">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  {listingToEdit ? "MODIFICATION D'ARTICLE" : "NOUVEL ARTICLE ADMIN"}
+                </span>
+                <span className="text-[10px] font-black uppercase font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  Tableau de bord Administrateur
+                </span>
+              </div>
+              <h2 className={`text-base sm:text-lg font-black tracking-tight font-display mt-0.5 ${
+                isLight ? "text-slate-900" : "text-white"
+              }`}>
+                {listingToEdit ? `Modifier : ${listingToEdit.title}` : "Publier un nouvel article dans le catalogue"}
+              </h2>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-xl transition-colors cursor-pointer ${
+              isLight ? "hover:bg-slate-200 text-slate-500" : "hover:bg-neutral-800 text-neutral-400"
+            }`}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+          
+          {errorMsg && (
+            <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold flex items-center gap-2">
+              <X className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Section 1: Photos de l'article (Core feature requested) */}
+          <div className={`p-5 rounded-2xl border space-y-4 ${
+            isLight ? "bg-slate-50/70 border-slate-200" : "bg-neutral-950/60 border-neutral-850"
+          }`}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className={`text-xs font-black uppercase tracking-wider ${isLight ? "text-slate-900" : "text-white"}`}>
+                    1. Photos du Produit ({photos.length} photo{photos.length > 1 ? "s" : ""})
+                  </h3>
+                  <p className={`text-[10px] ${isLight ? "text-slate-500" : "text-neutral-400"}`}>
+                    Téléversez des images, collez une URL ou choisissez dans la galerie rapide.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowPresets(!showPresets)}
+                className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                  showPresets
+                    ? "bg-amber-400 text-neutral-950 border-amber-400 font-extrabold"
+                    : isLight
+                      ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+                      : "bg-neutral-900 hover:bg-neutral-850 text-neutral-200 border-neutral-800"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {showPresets ? "Masquer la galerie" : "⚡ Galerie de photos prêtes"}
+              </button>
+            </div>
+
+            {/* Quick Presets Drawer */}
+            {showPresets && (
+              <div className={`p-4 rounded-xl border space-y-2.5 transition-all ${
+                isLight ? "bg-white border-amber-300 shadow-sm" : "bg-neutral-900 border-amber-500/30"
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-black uppercase ${isLight ? "text-slate-700" : "text-neutral-300"}`}>
+                    Cliquez sur une photo pour l'ajouter instantanément à l'article :
+                  </span>
+                  <span className="text-[9px] text-amber-500 font-bold">Modèles populaires Kinshasa</span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
+                  {PRESET_SAMPLE_PHOTOS.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleAddPresetPhoto(preset.url)}
+                      className={`group relative rounded-xl overflow-hidden border aspect-square p-0.5 text-left transition-all hover:scale-105 cursor-pointer ${
+                        isLight ? "border-slate-200 hover:border-amber-500" : "border-neutral-800 hover:border-amber-400"
+                      }`}
+                      title={preset.label}
+                    >
+                      <img src={preset.url} alt={preset.label} className="w-full h-full object-cover rounded-lg" />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Plus className="w-4 h-4 text-white" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Current Photos Gallery */}
+            {photos.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {photos.map((url, index) => (
+                  <div
+                    key={index}
+                    className={`relative rounded-2xl overflow-hidden border group aspect-square flex flex-col justify-between p-1.5 transition-all ${
+                      index === 0 
+                        ? "border-amber-500 shadow-xs" 
+                        : isLight ? "border-slate-200 bg-white" : "border-neutral-800 bg-neutral-900"
+                    }`}
+                  >
+                    <img 
+                      src={url} 
+                      alt={`Photo ${index + 1}`} 
+                      className="w-full h-full object-cover rounded-xl"
+                      referrerPolicy="no-referrer"
+                    />
+
+                    {/* Main photo badge */}
+                    {index === 0 && (
+                      <span className="absolute top-2 left-2 bg-amber-400 text-neutral-950 text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-sm">
+                        Principale
+                      </span>
+                    )}
+
+                    {/* Action overlay */}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1.5 transition-opacity rounded-xl">
+                      {index !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetMainPhoto(index)}
+                          title="Définir comme photo principale"
+                          className="p-1.5 bg-amber-400 text-neutral-950 rounded-lg hover:bg-amber-500 transition-colors cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(index)}
+                        title="Supprimer cette photo"
+                        className="p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={`p-8 rounded-2xl border border-dashed text-center space-y-2 ${
+                isLight ? "border-slate-300 bg-white/50 text-slate-500" : "border-neutral-800 bg-neutral-950/40 text-neutral-400"
+              }`}>
+                <ImageIcon className="w-8 h-8 mx-auto text-amber-500/60" />
+                <p className="font-bold text-xs">Aucune photo ajoutée pour le moment</p>
+                <p className="text-[10px]">Ajoutez au moins une photo en utilisant l'import ou l'URL ci-dessous.</p>
+              </div>
+            )}
+
+            {/* Photo Upload & URL inputs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              {/* File upload input */}
+              <label className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border border-dashed cursor-pointer transition-colors ${
+                isLight 
+                  ? "bg-white hover:bg-slate-100 border-slate-300 text-slate-700" 
+                  : "bg-neutral-900 hover:bg-neutral-850 border-neutral-750 text-neutral-300"
+              }`}>
+                <Upload className="w-4 h-4 text-amber-500 shrink-0" />
+                <span className="font-bold text-[11px]">Téléverser depuis l'ordinateur / téléphone</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+
+              {/* URL input */}
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  placeholder="Coller l'URL d'une image (https://...)"
+                  value={customPhotoUrl}
+                  onChange={(e) => setCustomPhotoUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddPhotoUrl();
+                    }
+                  }}
+                  className={`flex-1 rounded-xl px-3 py-2 text-xs border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddPhotoUrl}
+                  className="bg-amber-400 hover:bg-amber-500 text-neutral-950 font-black px-4 py-2 rounded-xl transition-colors shrink-0 cursor-pointer text-xs"
+                >
+                  Ajouter URL
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Prix & Devises (Core feature requested) */}
+          <div className={`p-5 rounded-2xl border space-y-4 ${
+            isLight ? "bg-slate-50/70 border-slate-200" : "bg-neutral-950/60 border-neutral-850"
+          }`}>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg">
+                <DollarSign className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className={`text-xs font-black uppercase tracking-wider ${isLight ? "text-slate-900" : "text-white"}`}>
+                  2. Prix de l'Article & Taux de Change
+                </h3>
+                <p className={`text-[10px] ${isLight ? "text-slate-500" : "text-neutral-400"}`}>
+                  Configurez le montant en dollars américains et la contre-valeur en Francs Congolais (CDF).
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* USD Price */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1.5 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Prix de Vente ($ USD) *
+                </label>
+                <div className="relative">
+                  <span className={`absolute left-3.5 top-2.5 font-bold ${isLight ? "text-slate-400" : "text-neutral-500"}`}>$</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    placeholder="Ex: 350"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                    className={`w-full rounded-xl pl-8 pr-3 py-2 text-sm font-black border focus:outline-none focus:border-amber-500 ${
+                      isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Exchange Rate */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1.5 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Taux de Change (CDF / 1 USD)
+                </label>
+                <input
+                  type="number"
+                  min="1000"
+                  step="10"
+                  value={exchangeRate}
+                  onChange={(e) => setExchangeRate(Number(e.target.value))}
+                  className={`w-full rounded-xl px-3 py-2 text-sm font-mono font-bold border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                />
+              </div>
+
+              {/* Real-time CDF Result */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1.5 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Équivalent en Francs Congolais (CDF)
+                </label>
+                <div className={`p-2.5 rounded-xl border font-mono font-bold text-sm flex items-center justify-between ${
+                  isLight ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-emerald-950/30 border-emerald-800/40 text-emerald-400"
+                }`}>
+                  <span>{calculatedCDF} CDF</span>
+                  <span className="text-[10px] font-sans font-black bg-emerald-500/20 px-2 py-0.5 rounded">RDC</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Price Helper Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+              <span className={`text-[10px] font-bold ${isLight ? "text-slate-500" : "text-neutral-400"}`}>Prix courants :</span>
+              {[70, 120, 180, 250, 350, 450, 600, 850, 1100].map((presetPrice) => (
+                <button
+                  key={presetPrice}
+                  type="button"
+                  onClick={() => setPrice(presetPrice)}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-colors cursor-pointer border ${
+                    price === presetPrice
+                      ? "bg-amber-400 border-amber-400 text-neutral-950 font-black"
+                      : isLight 
+                        ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-200" 
+                        : "bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border-neutral-800"
+                  }`}
+                >
+                  ${presetPrice}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 3: Titre & Description du Produit (Core feature requested) */}
+          <div className={`p-5 rounded-2xl border space-y-4 ${
+            isLight ? "bg-slate-50/70 border-slate-200" : "bg-neutral-950/60 border-neutral-850"
+          }`}>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className={`text-xs font-black uppercase tracking-wider ${isLight ? "text-slate-900" : "text-white"}`}>
+                  3. Titre & Description Complète du Produit
+                </h3>
+                <p className={`text-[10px] ${isLight ? "text-slate-500" : "text-neutral-400"}`}>
+                  Rédigez la description détaillée pour rassurer les acheteurs kinois.
+                </p>
+              </div>
+            </div>
+
+            {/* Title */}
+            <div>
+              <label className={`block font-bold text-[10px] uppercase mb-1.5 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                Titre Principal de l'Annonce *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ex: iPhone 14 Pro Max 256GB Gold - État Neuf Certifié"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className={`w-full rounded-xl px-3 py-2 text-xs font-bold border focus:outline-none focus:border-amber-500 ${
+                  isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                }`}
+              />
+            </div>
+
+            {/* Description Textarea */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className={`font-bold text-[10px] uppercase ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Description Détaillée du Produit *
+                </label>
+                <span className={`text-[10px] ${isLight ? "text-slate-500" : "text-neutral-400"}`}>
+                  {description.length} caractères
+                </span>
+              </div>
+              <textarea
+                rows={4}
+                required
+                placeholder="Décrivez l'historique du téléphone, l'état physique, la durée de batterie, les accessoires fournis et la garantie..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className={`w-full rounded-xl p-3 text-xs leading-relaxed border focus:outline-none focus:border-amber-500 ${
+                  isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                }`}
+              />
+            </div>
+
+            {/* Description Snippet Suggestions */}
+            <div className="space-y-1.5">
+              <span className={`text-[10px] font-bold block ${isLight ? "text-slate-500" : "text-neutral-400"}`}>
+                Ajouter des mentions rassurantes en un clic :
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {DESCRIPTION_TEMPLATES.map((snippet, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleAppendDescriptionTemplate(snippet)}
+                    className={`text-[10px] font-medium py-1 px-2.5 rounded-lg border transition-colors cursor-pointer text-left ${
+                      isLight 
+                        ? "bg-white hover:bg-slate-100 border-slate-200 text-slate-700" 
+                        : "bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300"
+                    }`}
+                  >
+                    + {snippet.substring(0, 45)}...
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Spécifications Techniques & État */}
+          <div className={`p-5 rounded-2xl border space-y-4 ${
+            isLight ? "bg-slate-50/70 border-slate-200" : "bg-neutral-950/60 border-neutral-850"
+          }`}>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-purple-500/10 text-purple-500 rounded-lg">
+                <Smartphone className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className={`text-xs font-black uppercase tracking-wider ${isLight ? "text-slate-900" : "text-white"}`}>
+                  4. Caractéristiques Techniques & Audit IMEI
+                </h3>
+                <p className={`text-[10px] ${isLight ? "text-slate-500" : "text-neutral-400"}`}>
+                  Marque, mémoire, batterie et contrôle anti-vol pour l'acheteur.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* Marque */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Marque
+                </label>
+                <select
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                >
+                  {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+
+              {/* Modèle */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Modèle Exact *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: 14 Pro Max"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                />
+              </div>
+
+              {/* Stockage */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Stockage (GB)
+                </label>
+                <select
+                  value={storage}
+                  onChange={(e) => setStorage(Number(e.target.value))}
+                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                >
+                  <option value={32}>32 GB</option>
+                  <option value={64}>64 GB</option>
+                  <option value={128}>128 GB</option>
+                  <option value={256}>256 GB</option>
+                  <option value={512}>512 GB</option>
+                  <option value={1024}>1 TB (1024 GB)</option>
+                </select>
+              </div>
+
+              {/* RAM */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  RAM (GB)
+                </label>
+                <select
+                  value={ram}
+                  onChange={(e) => setRam(Number(e.target.value))}
+                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                >
+                  <option value={3}>3 GB</option>
+                  <option value={4}>4 GB</option>
+                  <option value={6}>6 GB</option>
+                  <option value={8}>8 GB</option>
+                  <option value={12}>12 GB</option>
+                  <option value={16}>16 GB</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* État de l'écran */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  État de l'Écran
+                </label>
+                <select
+                  value={screenCondition}
+                  onChange={(e) => setScreenCondition(e.target.value as any)}
+                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                >
+                  {SCREEN_CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              {/* Santé Batterie */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Santé Batterie (%)
+                </label>
+                <input
+                  type="number"
+                  min="50"
+                  max="100"
+                  value={batteryHealth}
+                  onChange={(e) => setBatteryHealth(Number(e.target.value))}
+                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                />
+              </div>
+
+              {/* Numéro IMEI */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Numéro IMEI
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: 358940294829104"
+                  value={imei}
+                  onChange={(e) => setImei(e.target.value)}
+                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-mono font-bold border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                />
+              </div>
+
+              {/* Point de rencontre public */}
+              <div>
+                <label className={`block font-bold text-[10px] uppercase mb-1 ${isLight ? "text-slate-600" : "text-neutral-400"}`}>
+                  Lieu d'échange sécurisé
+                </label>
+                <select
+                  value={preferredZone}
+                  onChange={(e) => setPreferredZone(e.target.value)}
+                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold border focus:outline-none focus:border-amber-500 ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-neutral-900 border-neutral-800 text-white"
+                  }`}
+                >
+                  {KINSHASA_SAFE_ZONES.map(z => (
+                    <option key={z.id} value={z.id}>{z.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Disponibilité Status Toggle */}
+            <div className={`p-3 rounded-xl border flex items-center justify-between ${
+              isLight ? "bg-white border-slate-200" : "bg-neutral-900 border-neutral-800"
+            }`}>
+              <div>
+                <span className={`font-bold block ${isLight ? "text-slate-900" : "text-white"}`}>
+                  Disponibilité de l'article dans le catalogue
+                </span>
+                <span className={`text-[10px] ${isLight ? "text-slate-500" : "text-neutral-400"}`}>
+                  {isAvailable ? "L'article est affiché en direct pour tous les acheteurs." : "L'article est masqué ou marqué vendu."}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAvailable(!isAvailable)}
+                className={`px-3 py-1.5 rounded-xl font-black text-xs transition-colors cursor-pointer border ${
+                  isAvailable
+                    ? "bg-emerald-500 text-neutral-950 border-emerald-500 font-extrabold"
+                    : "bg-red-500/20 text-red-500 border-red-500/30"
+                }`}
+              >
+                {isAvailable ? "🟢 DISPONIBLE (EN VENTE)" : "🔴 MASQUÉ / VENDU"}
+              </button>
+            </div>
+          </div>
+
+          {/* Form Actions Footer */}
+          <div className={`pt-4 border-t flex items-center justify-end gap-3 sticky bottom-0 py-3 ${
+            isLight ? "bg-white border-slate-200" : "bg-neutral-900 border-neutral-800"
+          }`}>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`px-5 py-2.5 rounded-xl font-bold transition-colors cursor-pointer border ${
+                isLight 
+                  ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200" 
+                  : "bg-neutral-850 hover:bg-neutral-800 text-neutral-300 border-neutral-800"
+              }`}
+            >
+              Annuler
+            </button>
+
+            <button
+              type="submit"
+              className="bg-amber-400 hover:bg-amber-500 text-neutral-950 font-black px-6 py-2.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2 text-xs"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              {listingToEdit ? "Enregistrer les modifications" : "Publier l'article dans le catalogue"}
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  );
+}
